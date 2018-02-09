@@ -56,9 +56,17 @@
 #define VK_USE_PLATFORM_XLIB_KHR
 #define VK_USE_PLATFORM_XCB_KHR
 #endif
+#if SDL_VIDEO_DRIVER_FUCHSIA
+#define VK_USE_PLATFORM_MAGMA_KHR
+#endif
 
 #define VK_NO_PROTOTYPES
+
+#ifdef SDL_VULKAN_HEADER
+#include SDL_VULKAN_HEADER
+#else
 #include "./khronos/vulkan/vulkan.h"
+#endif
 
 #include "SDL_vulkan.h"
 
