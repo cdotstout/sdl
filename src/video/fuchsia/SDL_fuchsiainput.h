@@ -19,60 +19,37 @@
   3. This notice may not be removed or altered from any source distribution.
 */
 
-#ifndef SDL_fuchsiautil_
-#define SDL_fuchsiautil_
-
 #include "../../SDL_internal.h"
 
-#include <stdio.h>
-#include <unistd.h> // for close
+#if SDL_VIDEO_DRIVER_FUCHSIA
 
-#define DRET(t, msg) dret(t, __FILE__, __LINE__, msg)
+#include <memory>
+#include <vector>
 
-template <class T>
-T
-dret(T ret, const char *file, int line, const char *msg)
-{
-    if (!static_cast<bool>(ret))
-        printf("%s\n", msg);
-    return ret;
-}
-
-template <int>
-int
-dret(int ret, const char *file, int line, const char *msg)
-{
-    if (ret)
-        printf("%s\n", msg);
-    return ret;
-}
-
-class ScopedFd {
+class InputDeviceBase {
 public:
-    ScopedFd(int fd) : fd_(fd)
+    virtual void
+    Pump() = 0;
+    virtual ~InputDeviceBase()
     {
     }
-    ~ScopedFd()
-    {
-        close(fd_);
-    }
+};
 
-    int
-    get()
-    {
-        return fd_;
-    }
+class InputManager {
+public:
+    static std::unique_ptr<InputManager>
+    Create();
 
-    int
-    release()
+    void
+    Pump();
+
+    InputManager(std::vector<std::unique_ptr<InputDeviceBase>> input_devices)
+        : input_devices_(std::move(input_devices))
     {
-        int fd = fd_;
-        fd_ = -1;
-        return fd;
     }
 
 private:
-    int fd_;
+    std::vector<std::unique_ptr<InputDeviceBase>> input_devices_;
 };
 
-#endif /* SDL_fuchsiautil_ */
+#endif /* SDL_VIDEO_DRIVER_FUCHSIA */

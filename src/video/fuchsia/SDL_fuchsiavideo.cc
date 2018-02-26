@@ -29,6 +29,7 @@ extern "C" {
 #include "../SDL_sysvideo.h"
 }
 
+#include "SDL_fuchsiainput.h"
 #include "SDL_fuchsiautil.h"
 #include "SDL_fuchsiavulkan.h"
 
@@ -54,10 +55,15 @@ public:
         if (fd < 0)
             return DRET(nullptr, "open failed");
 
-        return std::unique_ptr<VideoData>(new VideoData(fd));
+        std::unique_ptr<InputManager> input_manager = InputManager::Create();
+        if (!input_manager)
+            return DRET(nullptr, "InputManager::Create failed");
+
+        return std::unique_ptr<VideoData>(new VideoData(fd, std::move(input_manager)));
     }
 
-    VideoData(int fd) : fd_(fd)
+    VideoData(int fd, std::unique_ptr<InputManager> input_manager)
+        : fd_(fd), input_manager_(std::move(input_manager))
     {
     }
 
@@ -78,8 +84,15 @@ public:
         close(fd_);
     }
 
+    InputManager *
+    input_manager()
+    {
+        return input_manager_.get();
+    }
+
 private:
     int fd_;
+    std::unique_ptr<InputManager> input_manager_;
 };
 
 int Fuchsia_VideoInit(_THIS)
@@ -111,6 +124,8 @@ void Fuchsia_VideoQuit(_THIS)
 
 void Fuchsia_PumpEvents(_THIS)
 {
+    auto video_data = reinterpret_cast<VideoData *>(_this->driverdata);
+    video_data->input_manager()->Pump();
 }
 
 static void
