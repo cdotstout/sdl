@@ -43,17 +43,6 @@ extern "C" {
 
 class InputDevice : public InputDeviceBase {
 public:
-    static std::unique_ptr<InputDevice>
-    Create(int fd, input_report_size_t report_size)
-    {
-        return std::unique_ptr<InputDevice>(new InputDevice(fd, std::vector<uint8_t>(report_size)));
-    }
-
-    // Takes ownership over arguments.
-    InputDevice(int fd, std::vector<uint8_t> report) : fd_(fd), report_(std::move(report))
-    {
-    }
-
     ~InputDevice() override
     {
         close(fd_);
@@ -65,12 +54,31 @@ public:
         ssize_t ret = read(fd_, report_.data(), report_.size());
         if (ret < 0)
             return;
-        ParseKeyboardReport(report_.data(), ret);
+        ParseReport(report_.data(), ret);
     }
 
-private:
+protected:
+    // Takes ownership over arguments.
+    InputDevice(int fd, unsigned int max_report_size) : fd_(fd), report_(max_report_size)
+    {
+    }
+
+    virtual void
+    ParseReport(uint8_t *report, size_t len) = 0;
+
+    int fd_;
+    std::vector<uint8_t> report_;
+};
+
+class KeyboardDevice : public InputDevice {
+public:
+    KeyboardDevice(int fd, unsigned int max_report_size) : InputDevice(fd, max_report_size)
+    {
+    }
+
+protected:
     void
-    ParseKeyboardReport(uint8_t *report, size_t len)
+    ParseReport(uint8_t *report, size_t len) override
     {
         hid_keys_t current_key_state;
 
@@ -93,9 +101,28 @@ private:
         memcpy(&previous_key_state_, &current_key_state, sizeof(hid_keys_t));
     }
 
-    int fd_;
-    std::vector<uint8_t> report_;
+private:
     hid_keys_t previous_key_state_{};
+};
+
+class MouseDevice : public InputDevice {
+public:
+    MouseDevice(int fd, unsigned int max_report_size,
+                std::function<void(boot_mouse_report_t *)> callback)
+        : InputDevice(fd, max_report_size), callback_(callback)
+    {
+    }
+
+protected:
+    void
+    ParseReport(uint8_t *report, size_t len) override
+    {
+        if (callback_)
+            callback_(reinterpret_cast<boot_mouse_report_t *>(report));
+    }
+
+private:
+    std::function<void(boot_mouse_report_t *)> callback_;
 };
 
 std::unique_ptr<InputManager>
@@ -106,7 +133,7 @@ InputManager::Create()
     if (!dir)
         return DRET(nullptr, "Error opening DEV_INPUT");
 
-    std::vector<std::unique_ptr<InputDeviceBase>> input_devices;
+    auto input_manager = std::unique_ptr<InputManager>(new InputManager());
 
     struct dirent *de;
     while ((de = readdir(dir))) {
@@ -128,22 +155,37 @@ InputManager::Create()
         if (rc < 0)
             continue;
 
-        if (proto != INPUT_PROTO_KBD)
-            continue;
-
         input_report_size_t max_report_len;
         rc = ioctl_input_get_max_reportsize(fd.get(), &max_report_len);
         if (rc < 0)
             continue;
 
-        input_devices.push_back(InputDevice::Create(fd.release(), max_report_len));
-        printf("Found input device: %s\n", name);
+        if (proto == INPUT_PROTO_KBD) {
+            printf("Found keyboard: %s\n", name);
+            input_manager->AddDevice(
+                std::unique_ptr<KeyboardDevice>(new KeyboardDevice(fd.release(), max_report_len)));
+        } else if (proto == INPUT_PROTO_MOUSE) {
+            printf("Found mouse: %s\n", name);
+            auto owner = input_manager.get();
+            auto callback = [owner](boot_mouse_report_t *report) {
+                if (owner->window_) {
+                    SDL_SendMouseMotion(owner->window_, 0, 1, report->rel_x, report->rel_y);
+                    SDL_SendMouseButton(owner->window_, 0,
+                                        (report->buttons & 1) ? SDL_PRESSED : SDL_RELEASED,
+                                        SDL_BUTTON_LEFT);
+                    SDL_SendMouseButton(owner->window_, 0,
+                                        (report->buttons & (1 << 1)) ? SDL_PRESSED : SDL_RELEASED,
+                                        SDL_BUTTON_RIGHT);
+                }
+            };
+            input_manager->AddDevice(std::unique_ptr<MouseDevice>(
+                new MouseDevice(fd.release(), max_report_len, callback)));
+        } else {
+            printf("Unhandled input device: %s proto %d\n", name, proto);
+        }
     }
 
-    if (input_devices.empty())
-        return DRET(nullptr, "no input devices");
-
-    return std::unique_ptr<InputManager>(new InputManager(std::move(input_devices)));
+    return input_manager;
 }
 
 void
