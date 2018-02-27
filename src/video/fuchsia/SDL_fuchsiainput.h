@@ -43,13 +43,21 @@ public:
     void
     Pump();
 
-    InputManager(std::vector<std::unique_ptr<InputDeviceBase>> input_devices)
-        : input_devices_(std::move(input_devices))
+    void
+    set_window(SDL_Window *window)
     {
+        window_ = window;
+    }
+
+    void
+    AddDevice(std::unique_ptr<InputDeviceBase> device)
+    {
+        input_devices_.push_back(std::move(device));
     }
 
 private:
     std::vector<std::unique_ptr<InputDeviceBase>> input_devices_;
+    SDL_Window *window_{};
 };
 
 #endif /* SDL_VIDEO_DRIVER_FUCHSIA */

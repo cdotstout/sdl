@@ -128,6 +128,19 @@ void Fuchsia_PumpEvents(_THIS)
     video_data->input_manager()->Pump();
 }
 
+static int
+Fuchsia_CreateWindow(_THIS, SDL_Window *window)
+{
+    reinterpret_cast<VideoData *>(_this->driverdata)->input_manager()->set_window(window);
+    return 0;
+}
+
+static void
+Fuchsia_DestroyWindow(_THIS, SDL_Window *window)
+{
+    reinterpret_cast<VideoData *>(_this->driverdata)->input_manager()->set_window(nullptr);
+}
+
 static void
 Fuchsia_DeleteDevice(SDL_VideoDevice *device)
 {
@@ -160,6 +173,9 @@ Fuchsia_CreateDevice(int devindex)
     device->Vulkan_GetInstanceExtensions = Fuchsia_Vulkan_GetInstanceExtensions;
     device->Vulkan_CreateSurface = Fuchsia_Vulkan_CreateSurface;
 #endif
+
+    device->CreateSDLWindow = Fuchsia_CreateWindow;
+    device->DestroyWindow = Fuchsia_DestroyWindow;
 
     return device;
 }
