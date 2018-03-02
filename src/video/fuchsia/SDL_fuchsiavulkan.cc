@@ -23,7 +23,7 @@
 
 #if SDL_VIDEO_VULKAN && SDL_VIDEO_DRIVER_FUCHSIA
 
-#include "SDL_assert.h"
+#include "SDL_fuchsiaview.h"
 #include "SDL_fuchsiavulkan.h"
 #include "SDL_loadso.h"
 #include "SDL_syswm.h"
@@ -128,9 +128,16 @@ Fuchsia_Vulkan_CreateSurface(_THIS, SDL_Window *window, VkInstance instance, VkS
                      " extension is not enabled in the Vulkan instance.");
         return SDL_FALSE;
     }
+
+    auto view = reinterpret_cast<FuchsiaView *>(window->driverdata);
+    assert(view);
+
     VkMagmaSurfaceCreateInfoKHR createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_MAGMA_SURFACE_CREATE_INFO_KHR;
     createInfo.pNext = nullptr;
+    createInfo.imagePipeHandle = view->GetImagePipeHandle();
+    createInfo.width = window->w;
+    createInfo.height = window->h;
 
     VkResult result = vkCreateMagmaSurfaceKHR(instance, &createInfo, NULL, surface);
     if (result != VK_SUCCESS) {

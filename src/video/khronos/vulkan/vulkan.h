@@ -28,7 +28,7 @@ extern "C" {
 
 
 #define VK_VERSION_1_0 1
-#include "./vk_platform.h"
+#include "vk_platform.h"
 
 #define VK_MAKE_VERSION(major, minor, patch) \
     (((major) << 22) | ((minor) << 12) | (patch))
@@ -43,7 +43,7 @@ extern "C" {
 #define VK_VERSION_MINOR(version) (((uint32_t)(version) >> 12) & 0x3ff)
 #define VK_VERSION_PATCH(version) ((uint32_t)(version) & 0xfff)
 // Version of this file
-#define VK_HEADER_VERSION 59
+#define VK_HEADER_VERSION 57
 
 
 #define VK_NULL_HANDLE 0
@@ -214,6 +214,7 @@ typedef enum VkStructureType {
     VK_STRUCTURE_TYPE_MIR_SURFACE_CREATE_INFO_KHR = 1000007000,
     VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR = 1000008000,
     VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR = 1000009000,
+    VK_STRUCTURE_TYPE_MAGMA_SURFACE_CREATE_INFO_KHR = 1000010000,
     VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT = 1000011000,
     VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_RASTERIZATION_ORDER_AMD = 1000018000,
     VK_STRUCTURE_TYPE_DEBUG_MARKER_OBJECT_NAME_INFO_EXT = 1000022000,
@@ -293,7 +294,7 @@ typedef enum VkStructureType {
     VK_STRUCTURE_TYPE_DEVICE_GENERATED_COMMANDS_LIMITS_NVX = 1000086004,
     VK_STRUCTURE_TYPE_DEVICE_GENERATED_COMMANDS_FEATURES_NVX = 1000086005,
     VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_W_SCALING_STATE_CREATE_INFO_NV = 1000087000,
-    VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_EXT = 1000090000,
+    VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES2_EXT = 1000090000,
     VK_STRUCTURE_TYPE_DISPLAY_POWER_INFO_EXT = 1000091000,
     VK_STRUCTURE_TYPE_DEVICE_EVENT_INFO_EXT = 1000091001,
     VK_STRUCTURE_TYPE_DISPLAY_EVENT_INFO_EXT = 1000091002,
@@ -333,6 +334,11 @@ typedef enum VkStructureType {
     VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_ADVANCED_STATE_CREATE_INFO_EXT = 1000148002,
     VK_STRUCTURE_TYPE_PIPELINE_COVERAGE_TO_COLOR_STATE_CREATE_INFO_NV = 1000149000,
     VK_STRUCTURE_TYPE_PIPELINE_COVERAGE_MODULATION_STATE_CREATE_INFO_NV = 1000152000,
+    VK_STRUCTURE_TYPE_IMPORT_MEMORY_FUCHSIA_HANDLE_INFO_KHR = 1001000000,
+    VK_STRUCTURE_TYPE_MEMORY_FUCHSIA_HANDLE_PROPERTIES_KHR = 1001000001,
+    VK_STRUCTURE_TYPE_MEMORY_GET_FUCHSIA_HANDLE_INFO_KHR = 1001000002,
+    VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_FUCHSIA_HANDLE_INFO_KHR = 1001001000,
+    VK_STRUCTURE_TYPE_SEMAPHORE_GET_FUCHSIA_HANDLE_INFO_KHR = 1001001001,
     VK_STRUCTURE_TYPE_BEGIN_RANGE = VK_STRUCTURE_TYPE_APPLICATION_INFO,
     VK_STRUCTURE_TYPE_END_RANGE = VK_STRUCTURE_TYPE_LOADER_DEVICE_CREATE_INFO,
     VK_STRUCTURE_TYPE_RANGE_SIZE = (VK_STRUCTURE_TYPE_LOADER_DEVICE_CREATE_INFO - VK_STRUCTURE_TYPE_APPLICATION_INFO + 1),
@@ -1048,6 +1054,7 @@ typedef enum VkImageUsageFlagBits {
     VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT = 0x00000020,
     VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT = 0x00000040,
     VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT = 0x00000080,
+    VK_IMAGE_USAGE_SCANOUT_BIT_GOOGLE = 0x00010000,
     VK_IMAGE_USAGE_FLAG_BITS_MAX_ENUM = 0x7FFFFFFF
 } VkImageUsageFlagBits;
 typedef VkFlags VkImageUsageFlags;
@@ -3970,6 +3977,38 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vkGetPhysicalDeviceWin32PresentationSupportKHR(
 #endif
 #endif /* VK_USE_PLATFORM_WIN32_KHR */
 
+#ifdef VK_USE_PLATFORM_MAGMA_KHR
+#define VK_KHR_magma_surface 1
+#define VK_KHR_MAGMA_SURFACE_SPEC_VERSION 1
+#define VK_KHR_MAGMA_SURFACE_EXTENSION_NAME "VK_KHR_magma_surface"
+
+typedef VkFlags VkMagmaSurfaceCreateFlagsKHR;
+
+typedef struct VkMagmaSurfaceCreateInfoKHR {
+    VkStructureType    sType;
+    const void*        pNext;
+    uint32_t           imagePipeHandle;
+    uint32_t           width;
+    uint32_t           height;
+} VkMagmaSurfaceCreateInfoKHR;
+
+
+typedef VkResult (VKAPI_PTR *PFN_vkCreateMagmaSurfaceKHR)(VkInstance instance, const VkMagmaSurfaceCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface);
+typedef VkBool32 (VKAPI_PTR *PFN_vkGetPhysicalDeviceMagmaPresentationSupportKHR)(VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex);
+
+#ifndef VK_NO_PROTOTYPES
+VKAPI_ATTR VkResult VKAPI_CALL vkCreateMagmaSurfaceKHR(
+    VkInstance                                  instance,
+    const VkMagmaSurfaceCreateInfoKHR*          pCreateInfo,
+    const VkAllocationCallbacks*                pAllocator,
+    VkSurfaceKHR*                               pSurface);
+
+VKAPI_ATTR VkBool32 VKAPI_CALL vkGetPhysicalDeviceMagmaPresentationSupportKHR(
+    VkPhysicalDevice                            physicalDevice,
+    uint32_t                                    queueFamilyIndex);
+#endif
+#endif /* VK_USE_PLATFORM_MAGMA_KHR */
+
 #define VK_KHR_sampler_mirror_clamp_to_edge 1
 #define VK_KHR_SAMPLER_MIRROR_CLAMP_TO_EDGE_SPEC_VERSION 1
 #define VK_KHR_SAMPLER_MIRROR_CLAMP_TO_EDGE_EXTENSION_NAME "VK_KHR_sampler_mirror_clamp_to_edge"
@@ -4119,6 +4158,7 @@ typedef enum VkExternalMemoryHandleTypeFlagBitsKHR {
     VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D11_TEXTURE_KMT_BIT_KHR = 0x00000010,
     VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_HEAP_BIT_KHR = 0x00000020,
     VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_RESOURCE_BIT_KHR = 0x00000040,
+    VK_EXTERNAL_MEMORY_HANDLE_TYPE_FUCHSIA_VMO_BIT_KHR = 0x00000080,
     VK_EXTERNAL_MEMORY_HANDLE_TYPE_FLAG_BITS_MAX_ENUM_KHR = 0x7FFFFFFF
 } VkExternalMemoryHandleTypeFlagBitsKHR;
 typedef VkFlags VkExternalMemoryHandleTypeFlagsKHR;
@@ -4332,6 +4372,7 @@ typedef enum VkExternalSemaphoreHandleTypeFlagBitsKHR {
     VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT_KHR = 0x00000004,
     VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT_KHR = 0x00000008,
     VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT_KHR = 0x00000010,
+    VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_FUCHSIA_FENCE_BIT_KHR = 0x00000020,
     VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_FLAG_BITS_MAX_ENUM_KHR = 0x7FFFFFFF
 } VkExternalSemaphoreHandleTypeFlagBitsKHR;
 typedef VkFlags VkExternalSemaphoreHandleTypeFlagsKHR;
@@ -4827,7 +4868,7 @@ typedef struct VkPhysicalDeviceVariablePointerFeaturesKHR {
 
 
 #define VK_KHR_dedicated_allocation 1
-#define VK_KHR_DEDICATED_ALLOCATION_SPEC_VERSION 3
+#define VK_KHR_DEDICATED_ALLOCATION_SPEC_VERSION 1
 #define VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME "VK_KHR_dedicated_allocation"
 
 typedef struct VkMemoryDedicatedRequirementsKHR {
@@ -4911,6 +4952,82 @@ VKAPI_ATTR void VKAPI_CALL vkGetImageSparseMemoryRequirements2KHR(
     const VkImageSparseMemoryRequirementsInfo2KHR* pInfo,
     uint32_t*                                   pSparseMemoryRequirementCount,
     VkSparseImageMemoryRequirements2KHR*        pSparseMemoryRequirements);
+#endif
+
+#define VK_KHR_external_memory_fuchsia 1
+#define VK_KHR_EXTERNAL_MEMORY_FUCHSIA_SPEC_VERSION 1
+#define VK_KHR_EXTERNAL_MEMORY_FUCHSIA_EXTENSION_NAME "VK_KHR_external_memory_fuchsia"
+
+typedef struct VkImportMemoryFuchsiaHandleInfoKHR {
+    VkStructureType                          sType;
+    const void*                              pNext;
+    VkExternalMemoryHandleTypeFlagBitsKHR    handleType;
+    uint32_t                                 handle;
+} VkImportMemoryFuchsiaHandleInfoKHR;
+
+typedef struct VkMemoryFuchsiaHandlePropertiesKHR {
+    VkStructureType    sType;
+    void*              pNext;
+    uint32_t           memoryTypeBits;
+} VkMemoryFuchsiaHandlePropertiesKHR;
+
+typedef struct VkMemoryGetFuchsiaHandleInfoKHR {
+    VkStructureType                          sType;
+    const void*                              pNext;
+    VkDeviceMemory                           memory;
+    VkExternalMemoryHandleTypeFlagBitsKHR    handleType;
+} VkMemoryGetFuchsiaHandleInfoKHR;
+
+
+typedef VkResult (VKAPI_PTR *PFN_vkGetMemoryFuchsiaHandleKHR)(VkDevice device, const VkMemoryGetFuchsiaHandleInfoKHR* pGetFuchsiaHandleInfo, uint32_t* pFuchsiaHandle);
+typedef VkResult (VKAPI_PTR *PFN_vkGetMemoryFuchsiaHandlePropertiesKHR)(VkDevice device, VkExternalMemoryHandleTypeFlagBitsKHR handleType, uint32_t fuchsiaHandle, VkMemoryFuchsiaHandlePropertiesKHR* pMemoryFuchsiaHandleProperties);
+
+#ifndef VK_NO_PROTOTYPES
+VKAPI_ATTR VkResult VKAPI_CALL vkGetMemoryFuchsiaHandleKHR(
+    VkDevice                                    device,
+    const VkMemoryGetFuchsiaHandleInfoKHR*      pGetFuchsiaHandleInfo,
+    uint32_t*                                   pFuchsiaHandle);
+
+VKAPI_ATTR VkResult VKAPI_CALL vkGetMemoryFuchsiaHandlePropertiesKHR(
+    VkDevice                                    device,
+    VkExternalMemoryHandleTypeFlagBitsKHR       handleType,
+    uint32_t                                    fuchsiaHandle,
+    VkMemoryFuchsiaHandlePropertiesKHR*         pMemoryFuchsiaHandleProperties);
+#endif
+
+#define VK_KHR_external_semaphore_fuchsia 1
+#define VK_KHR_EXTERNAL_SEMAPHORE_FUCHSIA_SPEC_VERSION 1
+#define VK_KHR_EXTERNAL_SEMAPHORE_FUCHSIA_EXTENSION_NAME "VK_KHR_external_semaphore_fuchsia"
+
+typedef struct VkImportSemaphoreFuchsiaHandleInfoKHR {
+    VkStructureType                             sType;
+    const void*                                 pNext;
+    VkSemaphore                                 semaphore;
+    VkSemaphoreImportFlagsKHR                   flags;
+    VkExternalSemaphoreHandleTypeFlagBitsKHR    handleType;
+    uint32_t                                    handle;
+} VkImportSemaphoreFuchsiaHandleInfoKHR;
+
+typedef struct VkSemaphoreGetFuchsiaHandleInfoKHR {
+    VkStructureType                             sType;
+    const void*                                 pNext;
+    VkSemaphore                                 semaphore;
+    VkExternalSemaphoreHandleTypeFlagBitsKHR    handleType;
+} VkSemaphoreGetFuchsiaHandleInfoKHR;
+
+
+typedef VkResult (VKAPI_PTR *PFN_vkImportSemaphoreFuchsiaHandleKHR)(VkDevice device, const VkImportSemaphoreFuchsiaHandleInfoKHR* pImportSemaphoreFuchsiaHandleInfo);
+typedef VkResult (VKAPI_PTR *PFN_vkGetSemaphoreFuchsiaHandleKHR)(VkDevice device, const VkSemaphoreGetFuchsiaHandleInfoKHR* pGetFuchsiaHandleInfo, uint32_t* pFuchsiaHandle);
+
+#ifndef VK_NO_PROTOTYPES
+VKAPI_ATTR VkResult VKAPI_CALL vkImportSemaphoreFuchsiaHandleKHR(
+    VkDevice                                    device,
+    const VkImportSemaphoreFuchsiaHandleInfoKHR* pImportSemaphoreFuchsiaHandleInfo);
+
+VKAPI_ATTR VkResult VKAPI_CALL vkGetSemaphoreFuchsiaHandleKHR(
+    VkDevice                                    device,
+    const VkSemaphoreGetFuchsiaHandleInfoKHR*   pGetFuchsiaHandleInfo,
+    uint32_t*                                   pFuchsiaHandle);
 #endif
 
 #define VK_EXT_debug_report 1
@@ -5648,7 +5765,7 @@ VKAPI_ATTR VkResult VKAPI_CALL vkEnumeratePhysicalDeviceGroupsKHX(
 VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkObjectTableNVX)
 VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkIndirectCommandsLayoutNVX)
 
-#define VK_NVX_DEVICE_GENERATED_COMMANDS_SPEC_VERSION 3
+#define VK_NVX_DEVICE_GENERATED_COMMANDS_SPEC_VERSION 1
 #define VK_NVX_DEVICE_GENERATED_COMMANDS_EXTENSION_NAME "VK_NVX_device_generated_commands"
 
 
@@ -5938,7 +6055,6 @@ VKAPI_ATTR VkResult VKAPI_CALL vkGetRandROutputDisplayEXT(
 #define VK_EXT_display_surface_counter 1
 #define VK_EXT_DISPLAY_SURFACE_COUNTER_SPEC_VERSION 1
 #define VK_EXT_DISPLAY_SURFACE_COUNTER_EXTENSION_NAME "VK_EXT_display_surface_counter"
-#define VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES2_EXT VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_EXT
 
 
 typedef enum VkSurfaceCounterFlagBitsEXT {
@@ -6343,11 +6459,6 @@ typedef struct VkPhysicalDeviceSamplerFilterMinmaxPropertiesEXT {
 #define VK_AMD_MIXED_ATTACHMENT_SAMPLES_EXTENSION_NAME "VK_AMD_mixed_attachment_samples"
 
 
-#define VK_EXT_shader_stencil_export 1
-#define VK_EXT_SHADER_STENCIL_EXPORT_SPEC_VERSION 1
-#define VK_EXT_SHADER_STENCIL_EXPORT_EXTENSION_NAME "VK_EXT_shader_stencil_export"
-
-
 #define VK_EXT_blend_operation_advanced 1
 #define VK_EXT_BLEND_OPERATION_ADVANCED_SPEC_VERSION 2
 #define VK_EXT_BLEND_OPERATION_ADVANCED_EXTENSION_NAME "VK_EXT_blend_operation_advanced"
@@ -6446,9 +6557,9 @@ typedef struct VkPipelineCoverageModulationStateCreateInfoNV {
 #define VK_EXT_POST_DEPTH_COVERAGE_EXTENSION_NAME "VK_EXT_post_depth_coverage"
 
 
-#define VK_EXT_shader_viewport_index_layer 1
-#define VK_EXT_SHADER_VIEWPORT_INDEX_LAYER_SPEC_VERSION 1
-#define VK_EXT_SHADER_VIEWPORT_INDEX_LAYER_EXTENSION_NAME "VK_EXT_shader_viewport_index_layer"
+#define VK_GOOGLE_image_usage_scanout 1
+#define VK_GOOGLE_IMAGE_USAGE_SCANOUT_SPEC_VERSION 1
+#define VK_GOOGLE_IMAGE_USAGE_SCANOUT_EXTENSION_NAME "VK_GOOGLE_image_usage_scanout"
 
 
 #ifdef __cplusplus

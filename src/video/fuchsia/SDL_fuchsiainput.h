@@ -38,16 +38,10 @@ public:
 class InputManager {
 public:
     static std::unique_ptr<InputManager>
-    Create();
+    Create(std::function<void(float rel_x, float rel_y, uint32_t buttons)> mouse_event_callback);
 
     void
     Pump();
-
-    void
-    set_window(SDL_Window *window)
-    {
-        window_ = window;
-    }
 
     void
     AddDevice(std::unique_ptr<InputDeviceBase> device)
@@ -55,9 +49,15 @@ public:
         input_devices_.push_back(std::move(device));
     }
 
+    InputManager(
+        std::function<void(float rel_x, float rel_y, uint32_t buttons)> mouse_event_callback)
+        : mouse_event_callback_(mouse_event_callback)
+    {
+    }
+
 private:
+    std::function<void(float rel_x, float rel_y, uint32_t buttons)> mouse_event_callback_;
     std::vector<std::unique_ptr<InputDeviceBase>> input_devices_;
-    SDL_Window *window_{};
 };
 
 #endif /* SDL_VIDEO_DRIVER_FUCHSIA */

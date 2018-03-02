@@ -23,18 +23,28 @@
 
 #if SDL_VIDEO_DRIVER_FUCHSIA
 
+#include "SDL_timer.h"
 #include "SDL_video.h"
 
 extern "C" {
 #include "../SDL_sysvideo.h"
+#include "../../events/SDL_events_c.h"
+#include "../src/events/SDL_windowevents_c.h"
 }
 
 #include "SDL_fuchsiainput.h"
 #include "SDL_fuchsiautil.h"
+#include "SDL_fuchsiaview.h"
 #include "SDL_fuchsiavulkan.h"
 
+#include "lib/app/cpp/application_context.h"
+#include "lib/fidl/cpp/bindings/binding_set.h"
+#include "lib/fsl/tasks/message_loop.h"
+#include "lib/ui/views/fidl/view_manager.fidl.h"
+#include "lib/ui/views/fidl/view_provider.fidl.h"
+#include "magma.h"
+
 #include <fcntl.h>
-#include <magma.h>
 #include <memory>
 #include <string>
 #include <unistd.h> // for close
@@ -42,7 +52,9 @@ extern "C" {
 
 #define FUCHSIA_VID_DRIVER_NAME "Fuchsia"
 
-class VideoData {
+#define FUCHSIA_VIEW_ENABLED 1
+
+class VideoData : public mozart::ViewProvider {
 public:
     static std::unique_ptr<VideoData>
     Create(uint32_t devindex)
@@ -55,15 +67,10 @@ public:
         if (fd < 0)
             return DRET(nullptr, "open failed");
 
-        std::unique_ptr<InputManager> input_manager = InputManager::Create();
-        if (!input_manager)
-            return DRET(nullptr, "InputManager::Create failed");
-
-        return std::unique_ptr<VideoData>(new VideoData(fd, std::move(input_manager)));
+        return std::unique_ptr<VideoData>(new VideoData(fd));
     }
 
-    VideoData(int fd, std::unique_ptr<InputManager> input_manager)
-        : fd_(fd), input_manager_(std::move(input_manager))
+    VideoData(int fd) : fd_(fd)
     {
     }
 
@@ -81,6 +88,8 @@ public:
 
     ~VideoData()
     {
+        if (application_context_)
+            application_context_->outgoing_services()->RemoveService<mozart::ViewProvider>();
         close(fd_);
     }
 
@@ -90,10 +99,147 @@ public:
         return input_manager_.get();
     }
 
+    void
+    PumpMessageLoop()
+    {
+        loop_.RunUntilIdle();
+    }
+
+    void
+    set_application_context(std::unique_ptr<app::ApplicationContext> context)
+    {
+        application_context_ = std::move(context);
+    }
+
+    app::ApplicationContext *
+    application_context()
+    {
+        return application_context_.get();
+    }
+
+    bool
+    CreateView();
+    bool
+    CreateInputManager();
+
+    void
+    SetWindow(SDL_Window *window)
+    {
+        window_ = window;
+    }
+    SDL_Window *
+    window()
+    {
+        return window_;
+    }
+
+    FuchsiaView *
+    view()
+    {
+        assert(window());
+        return reinterpret_cast<FuchsiaView *>(window()->driverdata);
+    }
+
 private:
+    // |ViewProvider|
+    void
+    CreateView(f1dl::InterfaceRequest<mozart::ViewOwner> view_owner_request,
+               f1dl::InterfaceRequest<app::ServiceProvider> view_services) override;
+
     int fd_;
     std::unique_ptr<InputManager> input_manager_;
+    std::unique_ptr<app::ApplicationContext> application_context_;
+    f1dl::BindingSet<mozart::ViewProvider> bindings_;
+    fsl::MessageLoop loop_{};
+    SDL_Window *window_{};
 };
+
+void
+VideoData::CreateView(f1dl::InterfaceRequest<mozart::ViewOwner> view_owner_request,
+                      f1dl::InterfaceRequest<app::ServiceProvider> view_services)
+{
+    SDL_Window *window = this->window();
+
+    auto resize_callback = [window]() {
+        printf("Fuchsia resize callback\n");
+        auto view = reinterpret_cast<FuchsiaView *>(window->driverdata);
+        assert(view);
+        if ((window->w != static_cast<int>(view->width())) ||
+            (window->h != static_cast<int>(view->height()))) {
+            SDL_SendWindowEvent(window, SDL_WINDOWEVENT_RESIZED, view->width(), view->height());
+        }
+    };
+    auto mouse_event_callback = [window](float x, float y, uint32_t buttons) {
+        auto view = reinterpret_cast<FuchsiaView *>(window->driverdata);
+        float dx, dy;
+        view->UpdatePointer(x, y, &dx, &dy);
+        SDL_SendMouseMotion(window, 0, 1, dx, dy);
+        SDL_SendMouseButton(window, 0,
+                            (buttons & mozart::kMousePrimaryButton) ? SDL_PRESSED : SDL_RELEASED,
+                            SDL_BUTTON_LEFT);
+        SDL_SendMouseButton(window, 0,
+                            (buttons & mozart::kMouseSecondaryButton) ? SDL_PRESSED : SDL_RELEASED,
+                            SDL_BUTTON_RIGHT);
+    };
+
+    assert(!window->driverdata);
+    window->driverdata =
+        new FuchsiaView(application_context_->ConnectToEnvironmentService<mozart::ViewManager>(),
+                        std::move(view_owner_request), resize_callback, mouse_event_callback);
+}
+
+bool
+VideoData::CreateView()
+{
+    application_context_->outgoing_services()->AddService<mozart::ViewProvider>(
+        [this](f1dl::InterfaceRequest<mozart::ViewProvider> request) {
+            printf("adding to bindings\n");
+            bindings_.AddBinding(this, std::move(request));
+        });
+
+    uint32_t start = SDL_GetTicks();
+    PumpMessageLoop();
+    constexpr uint32_t kTimeMs = 5000;
+
+    while (view() == nullptr) {
+        if (SDL_GetTicks() - start > kTimeMs)
+            return DRET(false, "timeout waiting for view creation");
+        PumpMessageLoop();
+        SDL_Delay(10);
+    }
+
+    while (view()->GetImagePipeHandle() == ZX_HANDLE_INVALID) {
+        if (SDL_GetTicks() - start > kTimeMs)
+            return DRET(false, "timeout waiting for image pipe");
+        PumpMessageLoop();
+        SDL_Delay(10);
+    }
+
+    // Fuchsia doesn't let you request a windows size, so update the initial window size
+    // to avoid a practically-guaranteed resize.
+    window()->w = window()->windowed.w = view()->width();
+    window()->h = window()->windowed.h = view()->height();
+
+    return true;
+}
+
+bool
+VideoData::CreateInputManager()
+{
+    auto mouse_event_callback = [window = this->window()](float rel_x, float rel_y,
+                                                          uint32_t buttons) {
+        SDL_SendMouseMotion(window, 0, 1, rel_x, rel_y);
+        SDL_SendMouseButton(window, 0, (buttons & 1) ? SDL_PRESSED : SDL_RELEASED, SDL_BUTTON_LEFT);
+        SDL_SendMouseButton(window, 0, (buttons & (1 << 1)) ? SDL_PRESSED : SDL_RELEASED,
+                            SDL_BUTTON_RIGHT);
+    };
+
+    input_manager_ = InputManager::Create(mouse_event_callback);
+    if (!input_manager_)
+        return DRET(false, "InputManager::Create failed");
+
+    return true;
+}
 
 int Fuchsia_VideoInit(_THIS)
 {
@@ -115,6 +261,13 @@ int Fuchsia_VideoInit(_THIS)
         return DRET(-1, "SDL_AddBasicVideoDisplay failed");
 
     SDL_AddDisplayMode(&_this->displays[0], &mode);
+
+#if FUCHSIA_VIEW_ENABLED
+    video_data->set_application_context(app::ApplicationContext::CreateFromStartupInfo());
+    if (!video_data->application_context())
+        return DRET(-1, "Failed to get application context");
+#endif
+
     return 0;
 }
 
@@ -125,20 +278,34 @@ void Fuchsia_VideoQuit(_THIS)
 void Fuchsia_PumpEvents(_THIS)
 {
     auto video_data = reinterpret_cast<VideoData *>(_this->driverdata);
-    video_data->input_manager()->Pump();
+    video_data->PumpMessageLoop();
+    if (video_data->input_manager())
+        video_data->input_manager()->Pump();
 }
 
 static int
 Fuchsia_CreateWindow(_THIS, SDL_Window *window)
 {
-    reinterpret_cast<VideoData *>(_this->driverdata)->input_manager()->set_window(window);
+    auto video_data = reinterpret_cast<VideoData *>(_this->driverdata);
+    video_data->SetWindow(window);
+
+#if FUCHSIA_VIEW_ENABLED
+    if (!video_data->CreateView())
+        return DRET(-1, "CreateView failed");
+#else
+    if (!video_data->CreateInputManager())
+        return DRET(-1, "CreateInputManager failed");
+#endif
+
     return 0;
 }
 
 static void
 Fuchsia_DestroyWindow(_THIS, SDL_Window *window)
 {
-    reinterpret_cast<VideoData *>(_this->driverdata)->input_manager()->set_window(nullptr);
+    reinterpret_cast<VideoData *>(_this->driverdata)->SetWindow(nullptr);
+    delete reinterpret_cast<FuchsiaView *>(window->driverdata);
+    window->driverdata = nullptr;
 }
 
 static void

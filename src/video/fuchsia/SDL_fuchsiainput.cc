@@ -27,7 +27,6 @@
 
 extern "C" {
 #include "../../events/SDL_events_c.h"
-#include "../SDL_sysvideo.h"
 }
 
 #include "SDL_fuchsiainput.h"
@@ -126,14 +125,15 @@ private:
 };
 
 std::unique_ptr<InputManager>
-InputManager::Create()
+InputManager::Create(
+    std::function<void(float rel_x, float rel_y, uint32_t buttons)> mouse_event_callback)
 {
     const char DEV_INPUT[] = "/dev/class/input";
     DIR *dir = opendir(DEV_INPUT);
     if (!dir)
         return DRET(nullptr, "Error opening DEV_INPUT");
 
-    auto input_manager = std::unique_ptr<InputManager>(new InputManager());
+    auto input_manager = std::make_unique<InputManager>(mouse_event_callback);
 
     struct dirent *de;
     while ((de = readdir(dir))) {
@@ -166,17 +166,8 @@ InputManager::Create()
                 std::unique_ptr<KeyboardDevice>(new KeyboardDevice(fd.release(), max_report_len)));
         } else if (proto == INPUT_PROTO_MOUSE) {
             printf("Found mouse: %s\n", name);
-            auto owner = input_manager.get();
-            auto callback = [owner](boot_mouse_report_t *report) {
-                if (owner->window_) {
-                    SDL_SendMouseMotion(owner->window_, 0, 1, report->rel_x, report->rel_y);
-                    SDL_SendMouseButton(owner->window_, 0,
-                                        (report->buttons & 1) ? SDL_PRESSED : SDL_RELEASED,
-                                        SDL_BUTTON_LEFT);
-                    SDL_SendMouseButton(owner->window_, 0,
-                                        (report->buttons & (1 << 1)) ? SDL_PRESSED : SDL_RELEASED,
-                                        SDL_BUTTON_RIGHT);
-                }
+            auto callback = [input_manager = input_manager.get()](boot_mouse_report_t *report) {
+                input_manager->mouse_event_callback_(report->rel_x, report->rel_y, report->buttons);
             };
             input_manager->AddDevice(std::unique_ptr<MouseDevice>(
                 new MouseDevice(fd.release(), max_report_len, callback)));
