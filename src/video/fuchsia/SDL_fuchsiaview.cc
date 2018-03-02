@@ -36,7 +36,7 @@ FuchsiaView::FuchsiaView(
     mozart::ViewManagerPtr view_manager,
     f1dl::InterfaceRequest<mozart::ViewOwner> view_owner_request,
     std::function<void()> resize_callback,
-    std::function<void(float x, float y, uint32_t buttons)> mouse_event_callback)
+    std::function<void(bool relative, float x, float y, uint32_t buttons)> mouse_event_callback)
     : BaseView(std::move(view_manager), std::move(view_owner_request), "sdl"),
       resize_callback_(resize_callback), mouse_event_callback_(mouse_event_callback),
       pane_node_(session())
@@ -96,7 +96,21 @@ FuchsiaView::OnInputEvent(mozart::InputEventPtr event)
         return true;
     } else if (event->is_pointer()) {
         const mozart::PointerEventPtr &ptr_event = event->get_pointer();
-        mouse_event_callback_(ptr_event->x, ptr_event->y, ptr_event->buttons);
+        // printf("ptr event type %d phase %d (mode %d)\n", ptr_event->type, ptr_event->phase,
+        // relative_pointer_mode_);
+        if (relative_pointer_mode_) {
+            if (ptr_event->type == mozart::PointerEvent::Type::TOUCH &&
+                ptr_event->phase != mozart::PointerEvent::Phase::MOVE) {
+                ptr_x_ = ptr_event->x;
+                ptr_y_ = ptr_event->y;
+            } else {
+                float dx, dy;
+                UpdatePointer(ptr_event->x, ptr_event->y, &dx, &dy);
+                mouse_event_callback_(true, dx, dy, ptr_event->buttons);
+            }
+        } else {
+            mouse_event_callback_(false, ptr_event->x, ptr_event->y, ptr_event->buttons);
+        }
         return true;
     }
     return false;
