@@ -31,7 +31,8 @@ public:
     FuchsiaView(mozart::ViewManagerPtr view_manager,
                 f1dl::InterfaceRequest<mozart::ViewOwner> view_owner_request,
                 std::function<void()> resize_callback,
-                std::function<void(float x, float y, uint32_t buttons)> mouse_event_callback);
+                std::function<void(bool relative, float x, float y, uint32_t buttons)>
+                    mouse_event_callback);
 
     uint32_t
     width()
@@ -51,6 +52,19 @@ public:
     }
 
     void
+    SetRelativePointerMode(bool enabled)
+    {
+        relative_pointer_mode_ = enabled;
+    }
+
+private:
+    void
+    OnSceneInvalidated(ui_mozart::PresentationInfoPtr presentation_info) override;
+
+    bool
+    OnInputEvent(mozart::InputEventPtr event) override;
+
+    void
     UpdatePointer(float x, float y, float *dx, float *dy)
     {
         if (ptr_x_ < 0) {
@@ -63,18 +77,12 @@ public:
         ptr_y_ = y;
     }
 
-private:
-    void
-    OnSceneInvalidated(ui_mozart::PresentationInfoPtr presentation_info) override;
-
-    bool
-    OnInputEvent(mozart::InputEventPtr event) override;
-
     mozart::SizeF size_;
     std::function<void()> resize_callback_;
-    std::function<void(float x, float y, uint32_t buttons)> mouse_event_callback_;
+    std::function<void(bool relative, float x, float y, uint32_t buttons)> mouse_event_callback_;
     scenic_lib::ShapeNode pane_node_;
     zx_handle_t image_pipe_handle_{};
+    bool relative_pointer_mode_ = false;
     float ptr_x_ = -1;
     float ptr_y_ = -1;
 

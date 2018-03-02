@@ -27,8 +27,8 @@
 #include "SDL_video.h"
 
 extern "C" {
-#include "../SDL_sysvideo.h"
 #include "../../events/SDL_events_c.h"
+#include "../SDL_sysvideo.h"
 #include "../src/events/SDL_windowevents_c.h"
 }
 
@@ -136,8 +136,7 @@ public:
     FuchsiaView *
     view()
     {
-        assert(window());
-        return reinterpret_cast<FuchsiaView *>(window()->driverdata);
+        return window() ? reinterpret_cast<FuchsiaView *>(window()->driverdata) : nullptr;
     }
 
 private:
@@ -169,11 +168,8 @@ VideoData::CreateView(f1dl::InterfaceRequest<mozart::ViewOwner> view_owner_reque
             SDL_SendWindowEvent(window, SDL_WINDOWEVENT_RESIZED, view->width(), view->height());
         }
     };
-    auto mouse_event_callback = [window](float x, float y, uint32_t buttons) {
-        auto view = reinterpret_cast<FuchsiaView *>(window->driverdata);
-        float dx, dy;
-        view->UpdatePointer(x, y, &dx, &dy);
-        SDL_SendMouseMotion(window, 0, 1, dx, dy);
+    auto mouse_event_callback = [window](bool relative, float x, float y, uint32_t buttons) {
+        SDL_SendMouseMotion(window, 0, relative, x, y);
         SDL_SendMouseButton(window, 0,
                             (buttons & mozart::kMousePrimaryButton) ? SDL_PRESSED : SDL_RELEASED,
                             SDL_BUTTON_LEFT);
@@ -315,6 +311,17 @@ Fuchsia_DeleteDevice(SDL_VideoDevice *device)
     SDL_free(device);
 }
 
+static int
+Fuchsia_SetRelativeMouseMode(SDL_bool enabled)
+{
+    auto video_data = reinterpret_cast<VideoData *>(SDL_GetVideoDevice()->driverdata);
+    if (video_data->view()) {
+        video_data->view()->SetRelativePointerMode(enabled);
+        return 1;
+    }
+    return 0;
+}
+
 static SDL_VideoDevice *
 Fuchsia_CreateDevice(int devindex)
 {
@@ -343,6 +350,9 @@ Fuchsia_CreateDevice(int devindex)
 
     device->CreateSDLWindow = Fuchsia_CreateWindow;
     device->DestroyWindow = Fuchsia_DestroyWindow;
+
+    SDL_Mouse *mouse = SDL_GetMouse();
+    mouse->SetRelativeMouseMode = Fuchsia_SetRelativeMouseMode;
 
     return device;
 }
