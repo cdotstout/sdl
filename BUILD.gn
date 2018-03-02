@@ -127,3 +127,14 @@ shared_library("SDL2") {
     "//zircon/public/lib/backtrace",
   ]
 }
+
+package("sdl") {
+  libraries = [
+    {
+      name = "libSDL2.so"
+    },
+  ]
+  deps = [
+    ":SDL2",
+  ]
+}
