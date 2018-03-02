@@ -1,0 +1,4 @@
+{
+    "dev": [ "class/input", "class/framebuffer" ],
+    "features": [ "vulkan", "persistent-storage" ]
+}
