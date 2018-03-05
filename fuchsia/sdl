@@ -1,0 +1,8 @@
+{
+    "languages": [
+        "cpp"
+    ],
+    "packages": {
+        "sdl" : "//third_party/sdl"
+    }
+}
