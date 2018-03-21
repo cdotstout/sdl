@@ -59,7 +59,7 @@ public:
 
 private:
     void
-    OnSceneInvalidated(ui_mozart::PresentationInfoPtr presentation_info) override;
+    OnSceneInvalidated(ui::PresentationInfoPtr presentation_info) override;
 
     bool
     OnInputEvent(mozart::InputEventPtr event) override;

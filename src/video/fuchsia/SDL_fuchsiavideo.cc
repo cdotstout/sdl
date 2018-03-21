@@ -106,12 +106,12 @@ public:
     }
 
     void
-    set_application_context(std::unique_ptr<app::ApplicationContext> context)
+    set_application_context(std::unique_ptr<component::ApplicationContext> context)
     {
         application_context_ = std::move(context);
     }
 
-    app::ApplicationContext *
+    component::ApplicationContext *
     application_context()
     {
         return application_context_.get();
@@ -143,11 +143,11 @@ private:
     // |ViewProvider|
     void
     CreateView(f1dl::InterfaceRequest<mozart::ViewOwner> view_owner_request,
-               f1dl::InterfaceRequest<app::ServiceProvider> view_services) override;
+               f1dl::InterfaceRequest<component::ServiceProvider> view_services) override;
 
     int fd_;
     std::unique_ptr<InputManager> input_manager_;
-    std::unique_ptr<app::ApplicationContext> application_context_;
+    std::unique_ptr<component::ApplicationContext> application_context_;
     f1dl::BindingSet<mozart::ViewProvider> bindings_;
     fsl::MessageLoop loop_{};
     SDL_Window *window_{};
@@ -155,7 +155,7 @@ private:
 
 void
 VideoData::CreateView(f1dl::InterfaceRequest<mozart::ViewOwner> view_owner_request,
-                      f1dl::InterfaceRequest<app::ServiceProvider> view_services)
+                      f1dl::InterfaceRequest<component::ServiceProvider> view_services)
 {
     SDL_Window *window = this->window();
 
@@ -259,7 +259,7 @@ int Fuchsia_VideoInit(_THIS)
     SDL_AddDisplayMode(&_this->displays[0], &mode);
 
 #if FUCHSIA_VIEW_ENABLED
-    video_data->set_application_context(app::ApplicationContext::CreateFromStartupInfo());
+    video_data->set_application_context(component::ApplicationContext::CreateFromStartupInfo());
     if (!video_data->application_context())
         return DRET(-1, "Failed to get application context");
 #endif
