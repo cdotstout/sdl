@@ -44,7 +44,7 @@ FuchsiaView::FuchsiaView(
 }
 
 void
-FuchsiaView::OnSceneInvalidated(ui_mozart::PresentationInfoPtr presentation_info)
+FuchsiaView::OnSceneInvalidated(ui::PresentationInfoPtr presentation_info)
 {
     if (size_.Equals(logical_size()))
         return;
@@ -64,13 +64,13 @@ FuchsiaView::OnSceneInvalidated(ui_mozart::PresentationInfoPtr presentation_info
     zx::channel::create(0, &endpoint0, &endpoint1);
 
     uint32_t image_pipe_id = session()->AllocResourceId();
-    session()->Enqueue(scenic_lib::NewCreateImagePipeOp(
-        image_pipe_id, f1dl::InterfaceRequest<scenic::ImagePipe>(std::move(endpoint1))));
+    session()->Enqueue(scenic_lib::NewCreateImagePipeCommand(
+        image_pipe_id, f1dl::InterfaceRequest<ui::gfx::ImagePipe>(std::move(endpoint1))));
     pane_material.SetTexture(image_pipe_id);
     session()->ReleaseResource(image_pipe_id);
 
     image_pipe_handle_ =
-        f1dl::InterfaceHandle<scenic::ImagePipe>(std::move(endpoint0)).TakeChannel().release();
+        f1dl::InterfaceHandle<ui::gfx::ImagePipe>(std::move(endpoint0)).TakeChannel().release();
 
     resize_callback_();
 }
